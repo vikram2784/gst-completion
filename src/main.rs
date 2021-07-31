@@ -3,18 +3,23 @@ mod gstreamer;
 use nom::branch::alt;
 use nom::bytes::complete::{is_a, is_not, take};
 use nom::character::complete::{char, space0, space1};
-use nom::combinator::{map_res, not, peek};
+use nom::combinator::{map_res, not, opt, peek};
 use nom::multi::{many0, many1};
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple};
-use nom::IResult;
+use nom::{IResult};
 
 use shell_completion::{BashCompletionInput, CompletionInput, CompletionSet};
 
-fn parse(s: &str) -> (i8, IResult<&str, Vec<(&str, Vec<(&str, &str)>)>>) {
+fn parse(
+    s: &str,
+) -> (
+    i8,
+    IResult<&str, Vec<(&str, Vec<(&str, &str)>, Option<(Option<&str>, &str)>)>>,
+) {
     let mut index = -1;
 
-    let res = many1(separated_pair(
-        preceded(
+    let res = many1(tuple((
+        delimited(
             map_res(
                 tuple((
                     char('!'),
@@ -35,8 +40,8 @@ fn parse(s: &str) -> (i8, IResult<&str, Vec<(&str, Vec<(&str, &str)>)>>) {
                     Err(nom::Err::<&str>::Error("error"))
                 }
             }),
+            tuple((space0, many0(tuple((char('-'), is_not(" \t"), space0))))),
         ),
-        tuple((space0, many0(tuple((char('-'), is_not(" \t"), space0))))),
         terminated(
             many0(separated_pair(
                 preceded(
@@ -79,12 +84,20 @@ fn parse(s: &str) -> (i8, IResult<&str, Vec<(&str, Vec<(&str, &str)>)>>) {
             )),
             many0(tuple((char('-'), is_not(" \t"), space0))),
         ),
-    ))(s);
+        opt(preceded(
+            peek(not(char('!'))),
+            separated_pair(
+                opt(is_not(".")),
+                char('.'),
+                terminated(is_not(" \t"), space0),
+            ),
+        )),
+    )))(s);
 
     (index, res)
 }
 
-fn is_remainder_sane(input: &BashCompletionInput, rem: &str) -> bool {
+fn is_remainder_sane(_input: &BashCompletionInput, rem: &str) -> bool {
     let res: IResult<&str, &str> = preceded(char('!'), space1)(rem);
     if let Ok(("", _)) = res {
         true
@@ -102,7 +115,7 @@ fn main() {
     gstreamer::init();
 
     let input = BashCompletionInput::from_env().expect("Missing expected environment variables");
-    
+
     if !input
         .current_word()
         .chars()
@@ -116,7 +129,7 @@ fn main() {
     } else {
         Some(input.current_word())
     };
-    
+
     let args = {
         let mut c = input.args();
         c[0] = "!";
@@ -140,11 +153,37 @@ fn main() {
             }
 
             let index = (i - 1) as usize;
+            let prev = &parsed[index];
 
-            if let Some(element) = gstreamer::find_element(parsed[index].0, None) {
+            let (prev_elem, prev_pad) = if let Some(pad) = prev.2 {
+                if let Some(elem_name) = pad.0 {
+                    let found = parsed.iter().find(|elem| {
+                        elem.1
+                            .iter()
+                            .find(|prop| prop.0 == "name" && prop.1 == elem_name)
+                            .is_some()
+                    });
+
+                    if let Some(elem) = found {
+                        (elem.0, Some(pad.1))
+                    } else {
+                        ("", Some(pad.1))
+                    }
+                } else {
+                    (parsed[index].0, Some(pad.1))
+                }
+            } else {
+                (parsed[index].0, None)
+            };
+
+            if let Some(element) = gstreamer::find_element(prev_elem, prev_pad) {
                 element.get_compatible_elements(current_word).suggest();
             }
-        } else if let Some(element) = gstreamer::find_element(parsed[i as usize].0, None) {
+        } else if let Some(element) = gstreamer::find_element(parsed[i as usize].0, None)  {
+            if parsed[i as usize].2.is_some() {
+                return;
+            }  
+
             let arr = parsed[i as usize]
                 .1
                 .iter()
@@ -156,6 +195,7 @@ fn main() {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342,3 +382,4 @@ mod tests {
         );
     }
 }
+*/

@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 lazy_static! {
     static ref LIST: Vec<ElementFactory> = {
         gst::init().unwrap();
-        gst::ElementFactory::list_get_elements(0xffffffff, gst::Rank::__Unknown(0))
+        gst::ElementFactory::list_get_elements(gst::ElementFactoryListType::ANY, gst::Rank::__Unknown(0))
     };
 }
 
@@ -22,7 +22,7 @@ impl BashGstElement {
             .list_properties()
             .into_iter()
             .filter_map(|x| {
-                let name = x.get_name();
+                let name = x.name();
 
                 match if let Some(p) = prefix {
                     if name.starts_with(p) {
@@ -48,7 +48,7 @@ impl BashGstElement {
         if let Some(p) = prefix {
             v = v
                 .into_iter()
-                .filter(|x| x.get_name().starts_with(p))
+                .filter(|x| x.name().starts_with(p))
                 .collect::<Vec<ElementFactory>>();
         }
 
@@ -62,20 +62,20 @@ impl BashGstElement {
             }
 
             let acaps = a
-                .get_static_pad_templates()
+                .static_pad_templates()
                 .iter()
                 .filter(|x| x.direction() == gst::PadDirection::Sink)
                 .fold(gst::Caps::new_empty(), |mut x, y| {
-                    x.merge(y.get_caps());
+                    x.merge(y.caps());
                     x
                 });
 
             let bcaps = b
-                .get_static_pad_templates()
+                .static_pad_templates()
                 .iter()
                 .filter(|x| x.direction() == gst::PadDirection::Sink)
                 .fold(gst::Caps::new_empty(), |mut x, y| {
-                    x.merge(y.get_caps());
+                    x.merge(y.caps());
                     x
                 });
 
@@ -86,18 +86,18 @@ impl BashGstElement {
             }
         });
 
-        v.into_iter().map(|x| x.get_name().to_string()).collect()
+        v.into_iter().map(|x| x.name().to_string()).collect()
     }
 }
 
 fn get_src_caps(factory: &ElementFactory, pad: Option<&str>) -> Caps {
     factory
-        .get_static_pad_templates()
+        .static_pad_templates()
         .into_iter()
         .filter(|x| {
             if x.direction() == gst::PadDirection::Src {
                 if let Some(p) = pad {
-                    x.name_template().starts_with(p)
+                    p.starts_with(x.name_template())
                 } else {
                     true
                 }
@@ -106,7 +106,7 @@ fn get_src_caps(factory: &ElementFactory, pad: Option<&str>) -> Caps {
             }
         })
         .fold(gst::Caps::new_empty(), |mut x, y| {
-            x.merge(y.get_caps());
+            x.merge(y.caps());
             x
         })
 }
@@ -114,7 +114,7 @@ fn get_src_caps(factory: &ElementFactory, pad: Option<&str>) -> Caps {
 pub fn get_elements(prefix: Option<&str>) -> Vec<String> {
     LIST.iter()
         .filter_map(|x| {
-            let name = x.get_name().to_string();
+            let name = x.name().to_string();
 
             if let Some(p) = prefix {
                 if name.starts_with(p) {
@@ -132,6 +132,7 @@ pub fn get_elements(prefix: Option<&str>) -> Vec<String> {
 pub fn find_element(name: &str, pad: Option<&str>) -> Option<BashGstElement> {
     if let Some(factory) = gst::ElementFactory::find(name) {
         let caps = get_src_caps(&factory, pad);
+        
         Some(BashGstElement {
             factory: factory,
             element: gst::ElementFactory::make(name, None).unwrap(),
