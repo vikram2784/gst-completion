@@ -6,7 +6,10 @@ use lazy_static::lazy_static;
 lazy_static! {
     static ref LIST: Vec<ElementFactory> = {
         gst::init().unwrap();
-        gst::ElementFactory::list_get_elements(gst::ElementFactoryListType::ANY, gst::Rank::__Unknown(0))
+        gst::ElementFactory::list_get_elements(
+            gst::ElementFactoryListType::ANY,
+            gst::Rank::__Unknown(0),
+        )
     };
 }
 
@@ -97,7 +100,7 @@ fn get_src_caps(factory: &ElementFactory, pad: Option<&str>) -> Caps {
         .filter(|x| {
             if x.direction() == gst::PadDirection::Src {
                 if let Some(p) = pad {
-                    p.starts_with(x.name_template())
+                    p.starts_with(x.name_template().split("%").nth(0).unwrap())
                 } else {
                     true
                 }
@@ -132,7 +135,7 @@ pub fn get_elements(prefix: Option<&str>) -> Vec<String> {
 pub fn find_element(name: &str, pad: Option<&str>) -> Option<BashGstElement> {
     if let Some(factory) = gst::ElementFactory::find(name) {
         let caps = get_src_caps(&factory, pad);
-        
+
         Some(BashGstElement {
             factory: factory,
             element: gst::ElementFactory::make(name, None).unwrap(),
