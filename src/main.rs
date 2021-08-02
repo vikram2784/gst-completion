@@ -118,9 +118,9 @@ fn parse(
 
 fn can_complete_path(rem: &str) -> bool {
     let res: IResult<&str, (&str, Option<&str>)> = separated_pair(
-        terminated(is_not("= \t"), space0),
+        terminated(is_not("= \t\'\""), space0),
         tuple((char('='), space0)),
-        opt(is_not(" \t")),
+        opt(is_not(" \t\'\"")),
     )(rem);
 
     if let Ok((o, (_, _))) = res {
@@ -371,6 +371,80 @@ mod tests {
                     vec![
                         ("filesrc", vec![], None),
                         ("fakesink", vec![("name", "abc"), ("test", "random=")], None)
+                    ]
+                ))
+            )
+        );
+    }
+
+    #[test]
+    fn test10() {
+        assert_eq!(
+            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt qt.video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
+            (
+                3,
+                Ok((
+                    "",
+                    vec![
+                        ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/video.mp4"), ("prop", "2")], None),
+                        ("qtdemux", vec![("name", "qt")], Some((Some("qt"), Some("video_0")))),
+                        ("ffdec_mpeg4", vec![], None),
+                        ("videosink", vec![("name", "abc"), ("test", "10")], None)
+                    ]
+                ))
+            )
+        );
+    }
+
+    #[test]
+    fn test11() {
+        assert_eq!(
+            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt qt. !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
+            (
+                3,
+                Ok((
+                    "",
+                    vec![
+                        ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/video.mp4"), ("prop", "2")], None),
+                        ("qtdemux", vec![("name", "qt")], Some((Some("qt"), None))),
+                        ("ffdec_mpeg4", vec![], None),
+                        ("videosink", vec![("name", "abc"), ("test", "10")], None)
+                    ]
+                ))
+            )
+        );
+    }
+
+    #[test]
+    fn test12() {
+        assert_eq!(
+            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt .video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
+            (
+                3,
+                Ok((
+                    "",
+                    vec![
+                        ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/video.mp4"), ("prop", "2")], None),
+                        ("qtdemux", vec![("name", "qt")], Some((None, Some("video_0")))),
+                        ("ffdec_mpeg4", vec![], None),
+                        ("videosink", vec![("name", "abc"), ("test", "10")], None)
+                    ]
+                ))
+            )
+        );
+    }
+
+    #[test]
+    fn test13() {
+        assert_eq!(
+            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
+            (
+                1,
+                Ok((
+                    "video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10   ",
+                    vec![
+                        ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/video.mp4"), ("prop", "2")], None),
+                        ("qtdemux", vec![("name", "qt")], None),
                     ]
                 ))
             )
