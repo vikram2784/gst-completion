@@ -6,7 +6,7 @@ use nom::character::complete::{char, space0, space1};
 use nom::combinator::{map_res, not, opt, peek, rest};
 use nom::multi::{many0, many1};
 use nom::sequence::{delimited, preceded, separated_pair, terminated, tuple};
-use nom::IResult;
+use nom::{AsChar, IResult};
 
 use shell_completion::{BashCompletionInput, CompletionInput, CompletionSet};
 
@@ -117,10 +117,10 @@ fn parse(
 }
 
 fn can_complete_path(rem: &str) -> bool {
-    let res: IResult<&str, (&str, Option<&str>)> = separated_pair(
+    let res: IResult<&str, (&str, &str)> = separated_pair(
         terminated(is_not("= \t\'\""), space0),
         tuple((char('='), space0)),
-        opt(is_not(" \t\'\"")),
+        rest
     )(rem);
 
     if let Ok((o, (_, _))) = res {
@@ -131,17 +131,19 @@ fn can_complete_path(rem: &str) -> bool {
 }
 
 fn is_remainder_sane(input: &BashCompletionInput, rem: &str) -> bool {
-    let res: IResult<&str, &str> = preceded(char('!'), space1)(rem);
-    if let Ok(("", _)) = res {
+    if rem.is_empty() {
+        true
+    } else if let Ok::<_, nom::Err<nom::error::Error<&str>>>(("", _)) =
+        preceded(char('!'), space1)(rem)
+    {
         true
     } else if can_complete_path(rem) {
         input.complete_file().suggest();
         false
-    } else if rem
-        .chars()
-        .all(|x| x.is_alphanumeric() || x == '-' || x == '_')
-    {
-        true
+    } else if rem.chars().nth(0).unwrap().is_alpha() {
+        rem[1..]
+            .chars()
+            .all(|x| x.is_alphanumeric() || x == '-' || x == '_')
     } else {
         false
     }
@@ -196,7 +198,7 @@ fn main() {
                         if let Some(elem) = found {
                             (elem.0, elem_pad.1)
                         } else {
-                            ("", elem_pad.1)
+                            return;
                         }
                     }
                     _ => (parsed[index].0, elem_pad.1),

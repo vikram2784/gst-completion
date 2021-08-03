@@ -14,7 +14,6 @@ lazy_static! {
 }
 
 pub struct BashGstElement {
-    factory: ElementFactory,
     element: Element,
     caps: Caps,
 }
@@ -137,8 +136,7 @@ pub fn find_element(name: &str, pad: Option<&str>) -> Option<BashGstElement> {
         let caps = get_src_caps(&factory, pad);
 
         Some(BashGstElement {
-            factory: factory,
-            element: gst::ElementFactory::make(name, None).unwrap(),
+            element: factory.create(Some(name)).unwrap(),
             caps: caps,
         })
     } else {
