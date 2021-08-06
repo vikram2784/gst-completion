@@ -8,8 +8,7 @@
 
 
 ### Build and Install
-`cargo build --release`
-`cargo install --path .` 
+`cargo build --release && cargo install --path .` 
 
 The executable called `_gst_completion` will be installed in   `$HOME/.cargo/bin`  or wherever your cargo path is setup. Make sure this path is in your `$PATH`.
 

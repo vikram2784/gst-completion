@@ -167,7 +167,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gstex"
+name = "gst-completion"
 version = "0.1.0"
 dependencies = [
  "gstreamer",
