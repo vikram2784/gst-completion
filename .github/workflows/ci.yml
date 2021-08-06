@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Install gstreamer dev packages
+        run: apt update && apt install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
