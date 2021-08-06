@@ -1,4 +1,3 @@
-use gst;
 use gst::prelude::*;
 use gst::{Caps, Element, ElementFactory};
 use lazy_static::lazy_static;
@@ -99,7 +98,7 @@ fn get_src_caps(factory: &ElementFactory, pad: Option<&str>) -> Caps {
         .filter(|x| {
             if x.direction() == gst::PadDirection::Src {
                 if let Some(p) = pad {
-                    p.starts_with(x.name_template().split("%").nth(0).unwrap())
+                    p.starts_with(x.name_template().split('%').next().unwrap())
                 } else {
                     true
                 }
@@ -137,7 +136,7 @@ pub fn find_element(name: &str, pad: Option<&str>) -> Option<BashGstElement> {
 
         Some(BashGstElement {
             element: factory.create(Some(name)).unwrap(),
-            caps: caps,
+            caps,
         })
     } else {
         None
@@ -148,6 +147,7 @@ pub fn init() {
     gst::init().unwrap();
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

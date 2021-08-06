@@ -10,6 +10,7 @@ use nom::{AsChar, IResult};
 
 use shell_completion::{BashCompletionInput, CompletionInput, CompletionSet};
 
+#[allow(clippy::type_complexity)]
 fn parse(
     s: &str,
 ) -> (
@@ -34,7 +35,7 @@ fn parse(
                     many0(tuple((char('-'), is_not(" \t"), space0))),
                 )),
                 |x| {
-                    index = index + 1;
+                    index += 1;
                     Ok::<_, nom::Err<&str>>(x)
                 },
             ),
@@ -80,7 +81,7 @@ fn parse(
                             many0(tuple((char('-'), is_not(" \t"), space0))),
                         ),
                         |s: &str| {
-                            if s.contains("\'") || s.contains("\"") {
+                            if s.contains('\'') || s.contains('\"') {
                                 Err(nom::Err::<&str>::Error("error"))
                             } else {
                                 Ok(s)
@@ -120,7 +121,7 @@ fn can_complete_path(rem: &str) -> bool {
     let res: IResult<&str, (&str, &str)> = separated_pair(
         terminated(is_not("= \t\'\""), space0),
         tuple((char('='), space0)),
-        rest
+        rest,
     )(rem);
 
     if let Ok((o, (_, _))) = res {
@@ -140,7 +141,7 @@ fn is_remainder_sane(input: &BashCompletionInput, rem: &str) -> bool {
     } else if can_complete_path(rem) {
         input.complete_file().suggest();
         false
-    } else if rem.chars().nth(0).unwrap().is_alpha() {
+    } else if rem.chars().next().unwrap().is_alpha() {
         rem[1..]
             .chars()
             .all(|x| x.is_alphanumeric() || x == '-' || x == '_')
@@ -176,7 +177,7 @@ fn main() {
         assert!(len > 0);
 
         if len as i8 == i
-            || (parsed[i as usize].1.len() == 0 && current_word == Some(parsed[i as usize].0))
+            || (parsed[i as usize].1.is_empty() && current_word == Some(parsed[i as usize].0))
         {
             if i == 0 {
                 return gstreamer::get_elements(current_word).suggest();
@@ -191,8 +192,7 @@ fn main() {
                         let found = parsed.iter().find(|elem| {
                             elem.1
                                 .iter()
-                                .find(|prop| prop.0 == "name" && prop.1 == elem_name)
-                                .is_some()
+                                .any(|prop| prop.0 == "name" && prop.1 == elem_name)
                         });
 
                         if let Some(elem) = found {
@@ -201,10 +201,10 @@ fn main() {
                             return;
                         }
                     }
-                    _ => (parsed[index].0, elem_pad.1),
+                    _ => (prev.0, elem_pad.1),
                 }
             } else {
-                (parsed[index].0, None)
+                (prev.0, None)
             };
 
             if let Some(element) = gstreamer::find_element(prev_elem, prev_pad) {
@@ -228,7 +228,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::parse;
 
     #[test]
     fn test0() {
@@ -248,7 +248,7 @@ mod tests {
     fn test1() {
         assert_eq!(
             parse("! filesrc "),
-            (1, Ok(("", vec![("filesrc", vec![], None)])))
+            (0, Ok(("", vec![("filesrc", vec![], None)])))
         );
     }
 
@@ -365,11 +365,11 @@ mod tests {
     #[test]
     fn test9() {
         assert_eq!(
-            parse("! filesrc ! fakesink name=abc test =  random=  "),
+            parse("! filesrc ! fakesink name=abc test =  random=  value"),
             (
                 1,
                 Ok((
-                    "",
+                    "value",
                     vec![
                         ("filesrc", vec![], None),
                         ("fakesink", vec![("name", "abc"), ("test", "random=")], None)
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn test10() {
         assert_eq!(
-            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt qt.video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
+            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt qt.video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10 "),
             (
                 3,
                 Ok((
@@ -401,13 +401,13 @@ mod tests {
     #[test]
     fn test11() {
         assert_eq!(
-            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt qt. !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
+            parse("! filesrc name=fsrc location= \"/tmp/my video.mp4\" prop = 2 ! qtdemux name=qt qt. !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
             (
                 3,
                 Ok((
                     "",
                     vec![
-                        ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/video.mp4"), ("prop", "2")], None),
+                        ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/my video.mp4"), ("prop", "2")], None),
                         ("qtdemux", vec![("name", "qt")], Some((Some("qt"), None))),
                         ("ffdec_mpeg4", vec![], None),
                         ("videosink", vec![("name", "abc"), ("test", "10")], None)
@@ -420,11 +420,11 @@ mod tests {
     #[test]
     fn test12() {
         assert_eq!(
-            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt .video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10   "),
+            parse("! filesrc name=fsrc location= /tmp/video.mp4 prop=2 ! qtdemux name=qt .video_0 !  ffdec_mpeg4 ! videosink name=abc test = 10"),
             (
                 3,
                 Ok((
-                    "",
+                    "test = 10",
                     vec![
                         ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/video.mp4"), ("prop", "2")], None),
                         ("qtdemux", vec![("name", "qt")], Some((None, Some("video_0")))),
