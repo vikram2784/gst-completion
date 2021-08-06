@@ -429,7 +429,7 @@ mod tests {
                         ("filesrc", vec![("name", "fsrc"), ("location", "/tmp/video.mp4"), ("prop", "2")], None),
                         ("qtdemux", vec![("name", "qt")], Some((None, Some("video_0")))),
                         ("ffdec_mpeg4", vec![], None),
-                        ("videosink", vec![("name", "abc"), ("test", "10")], None)
+                        ("videosink", vec![("name", "abc")], None)
                     ]
                 ))
             )

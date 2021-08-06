@@ -1,3 +1,4 @@
+[![Continuous integration](https://github.com/vikram2784/gst-completion/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vikram2784/gst-completion/actions/workflows/ci.yml)
 # gst-launch-1.0 shell completion
 ### Get suggestions for elements and it's properties as you build your gstreamer pipeline in the bash 🚀
 
