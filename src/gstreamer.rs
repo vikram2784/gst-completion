@@ -1,14 +1,17 @@
 use gst::prelude::*;
 use gst::{Caps, Element, ElementFactory};
+use gstreamer as gst;
 use lazy_static::lazy_static;
+use std::iter::Iterator;
 
 lazy_static! {
     static ref LIST: Vec<ElementFactory> = {
         gst::init().unwrap();
-        gst::ElementFactory::list_get_elements(
-            gst::ElementFactoryListType::ANY,
+        gst::ElementFactory::factories_with_type(
+            gst::ElementFactoryType::ANY,
             gst::Rank::__Unknown(0),
         )
+        .collect()
     };
 }
 
@@ -43,17 +46,19 @@ impl BashGstElement {
     }
 
     pub fn get_compatible_elements(&self, prefix: Option<&str>) -> Vec<String> {
-        let mut v =
-            gst::ElementFactory::list_filter(&LIST, &self.caps, gst::PadDirection::Sink, false);
+        let mut compat = LIST
+            .iter()
+            .filter(|factory| {
+                if let Some(p) = prefix {
+                    if factory.name().starts_with(p) == false {
+                        return false;
+                    }
+                }
+                factory.can_sink_any_caps(&self.caps)
+            })
+            .collect::<Vec<_>>();
 
-        if let Some(p) = prefix {
-            v = v
-                .into_iter()
-                .filter(|x| x.name().starts_with(p))
-                .collect::<Vec<ElementFactory>>();
-        }
-
-        v.sort_by(|a, b| {
+        compat.sort_by(|a, b| {
             let anycaps = gst::Caps::new_any();
 
             if a.can_sink_all_caps(&anycaps) {
@@ -87,7 +92,7 @@ impl BashGstElement {
             }
         });
 
-        v.into_iter().map(|x| x.name().to_string()).collect()
+        compat.into_iter().map(|x| x.name().to_string()).collect()
     }
 }
 
@@ -150,19 +155,6 @@ pub fn init() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test1() {
-        assert_eq!(
-            gst::ElementFactory::list_filter(
-                &LIST,
-                &gst::Caps::new_empty(),
-                gst::PadDirection::Sink,
-                false,
-            ),
-            Vec::<ElementFactory>::new()
-        )
-    }
 
     #[test]
     fn test2() {
