@@ -3,15 +3,58 @@ use gst::{Caps, Element, ElementFactory};
 use gstreamer as gst;
 use lazy_static::lazy_static;
 use std::iter::Iterator;
+use std::process::Command;
+
+const LIST_FAST: bool = false;
 
 lazy_static! {
     static ref LIST: Vec<ElementFactory> = {
         gst::init().unwrap();
-        gst::ElementFactory::factories_with_type(
-            gst::ElementFactoryType::ANY,
-            gst::Rank::__Unknown(0),
-        )
-        .collect()
+        let mut v = vec![];
+
+        if LIST_FAST {
+            for rank in [
+                gst::Rank::PRIMARY,
+                gst::Rank::SECONDARY,
+                gst::Rank::MARGINAL,
+                gst::Rank::NONE,
+            ] {
+                v.extend(
+                    gst::ElementFactory::factories_with_type(gst::ElementFactoryType::ANY, rank)
+                    .into_iter()
+                )
+            }
+        } else {
+            for elem in String::from_utf8(Command::new("gst-inspect-1.0").output().unwrap().stdout)
+                .unwrap()
+                    .split("\n")
+                    .filter_map(|x| {
+                        if x.is_empty() {
+                            None
+                        } else {
+                            let mut tokens = x.split(":");
+                            if tokens.next().unwrap().contains(" ") {
+                                None
+                            } else {
+                                Some(tokens.next().unwrap().trim().split(" ").next().unwrap())
+                            }
+                        }
+                    })
+            {
+                let elemf = gst::ElementFactory::find(elem);
+                if elemf.is_some() {
+                    v.push(elemf.unwrap())
+                } else {
+                    //println!("couldnt find {:?}", elem);
+                }
+            }
+        }
+
+        /*for x in v.iter() {
+            println!("{:?}", x.longname());
+        }*/
+
+        v
     };
 }
 
@@ -140,7 +183,7 @@ pub fn find_element(name: &str, pad: Option<&str>) -> Option<BashGstElement> {
         let caps = get_src_caps(&factory, pad);
 
         Some(BashGstElement {
-            element: factory.create(Some(name)).unwrap(),
+            element: factory.create().build().unwrap(),
             caps,
         })
     } else {
@@ -179,10 +222,34 @@ mod tests {
     #[test]
     fn test4() {
         gst::init().unwrap();
-        let element = find_element("udpsink", None).unwrap();
+        let element = find_element("fakesink", None).unwrap();
 
         for x in element.get_property_names(&[], None) {
             println!("-- {:?}", x);
         }
     }
+
+    /*#[test]
+    fn test5() {
+        gst::init().unwrap();
+        assert_eq!(
+            String::from_utf8(Command::new("gst-inspect-1.0").output().unwrap().stdout)
+                .unwrap()
+                .split("\n")
+                .filter_map(|x| {
+                    if x.is_empty() {
+                        None
+                    } else {
+                        let mut tokens = x.split(":");
+                        if tokens.next().unwrap().contains(" ") {
+                            None
+                        } else {
+                            Some(tokens.next().unwrap())
+                        }
+                    }
+                })
+                .count(),
+            LIST.len()
+        );
+    }*/
 }
