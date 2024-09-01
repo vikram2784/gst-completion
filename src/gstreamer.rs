@@ -41,9 +41,8 @@ lazy_static! {
                         }
                     })
             {
-                let elemf = gst::ElementFactory::find(elem);
-                if elemf.is_some() {
-                    v.push(elemf.unwrap())
+                if let Some(element) = gst::ElementFactory::find(elem) {
+                    v.push(element)
                 } else {
                     //println!("couldnt find {:?}", elem);
                 }
